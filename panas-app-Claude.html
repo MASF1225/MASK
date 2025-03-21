@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PANAS心理評価尺度</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .question-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #6c757d;
+        }
+        .question-card:hover {
+            border-left: 4px solid #0d6efd;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .rating-options {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .rating-options .form-check {
+            text-align: center;
+            flex: 1;
+        }
+        .scale-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        .results-container {
+            display: none;
+        }
+        #historyTable {
+            font-size: 0.9rem;
+        }
+        .history-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h1 class="h3 mb-0 text-center">PANAS心理評価尺度</h1>
+                    </div>
+                    <div class="card-body">
+                        <!-- 説明文 -->
+                        <div class="alert alert-info mb-4">
+                            <p class="mb-0">以下の項目は、あなたが感じうるさまざまな感情や気分を表しています。それぞれの項目をよく読んで、<strong>現在（または過去1週間）</strong>あなたがどの程度その気分を感じているかを評価してください。</p>
+                        </div>
+
+                        <!-- ID入力フォーム -->
+                        <div class="mb-4" id="idInputForm">
+                            <div class="mb-3">
+                                <label for="respondentId" class="form-label">回答者ID</label>
+                                <input type="text" class="form-control" id="respondentId" placeholder="IDを入力してください">
+                                <div class="form-text">IDは結果を識別するために使用されます。</div>
+                            </div>
+                            <button id="startSurvey" class="btn btn-primary">評価を開始</button>
+                        </div>
+
+                        <!-- 質問フォーム -->
+                        <div id="surveyForm" style="display: none;">
+                            <form id="panasForm">
+                                <div id="questionsContainer">
+                                    <!-- 質問項目がJSで動的に追加されます -->
+                                </div>
+                                <div class="d-grid gap-2 mt-4">
+                                    <button type="submit" class="btn btn-primary btn-lg">結果を表示</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- 結果表示 -->
+                        <div class="results-container" id="resultsContainer">
+                            <h2 class="h4 mb-3">評価結果</h2>
+                            
+                            <div class="row mb-4">
+                                <div class="col-lg-8 mx-auto">
+                                    <canvas id="resultsChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-4 gx-4">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">ポジティブ感情スコア</h5>
+                                            <p class="display-4" id="positiveScore">-</p>
+                                            <p class="card-text text-muted">スコアが高いほど、ポジティブな感情状態が強いことを示します。</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">ネガティブ感情スコア</h5>
+                                            <p class="display-4" id="negativeScore">-</p>
+                                            <p class="card-text text-muted">スコアが高いほど、ネガティブな感情状態が強いことを示します。</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-secondary mb-4">
+                                <h5>解釈ガイド</h5>
+                                <ul>
+                                    <li>ポジティブ感情とネガティブ感情は独立しています - 一方が高くても、もう一方が必ずしも低いとは限りません。</li>
+                                    <li>一般的に、健康な感情状態では、ポジティブ感情がネガティブ感情よりも優位になります。</li>
+                                    <li>ネガティブ感情が継続的に高い場合は、専門家に相談することをお勧めします。</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                                <button id="showHistory" class="btn btn-secondary">履歴を表示</button>
+                                <button id="resetSurvey" class="btn btn-primary">もう一度評価する</button>
+                            </div>
+                        </div>
+
+                        <!-- 履歴表示 -->
+                        <div class="history-container" id="historyContainer">
+                            <h2 class="h4 mb-3">評価履歴</h2>
+                            
+                            <div class="table-responsive mb-3">
+                                <table class="table table-striped table-hover" id="historyTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>日時</th>
+                                            <th>回答者ID</th>
+                                            <th>ポジティブスコア</th>
+                                            <th>ネガティブスコア</th>
+                                            <th>アクション</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- 履歴データがJSで動的に追加されます -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                                <button id="downloadCSV" class="btn btn-success">CSV形式でダウンロード</button>
+                                <button id="backToResults" class="btn btn-secondary">結果に戻る</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // PANAS項目
+            const panasItems = [
+                { id: 1, text: "興味のある", type: "positive" },
+                { id: 2, text: "苦悩した", type: "negative" },
+                { id: 3, text: "興奮した", type: "positive" },
+                { id: 4, text: "動揺した", type: "negative" },
+                { id: 5, text: "強気な", type: "positive" },
+                { id: 6, text: "罪悪感のある", type: "negative" },
+                { id: 7, text: "おびえた", type: "negative" },
+                { id: 8, text: "敵意のある", type: "negative" },
+                { id: 9, text: "熱中した", type: "positive" },
+                { id: 10, text: "誇らしい", type: "positive" },
+                { id: 11, text: "いらだった", type: "negative" },
+                { id: 12, text: "機敏な", type: "positive" },
+                { id: 13, text: "恥じた", type: "negative" },
+                { id: 14, text: "インスピレーションを受けた", type: "positive" },
+                { id: 15, text: "神経質な", type: "negative" },
+                { id: 16, text: "決心した", type: "positive" },
+                { id: 17, text: "注意深い", type: "positive" },
+                { id: 18, text: "ぴりぴりした", type: "negative" },
+                { id: 19, text: "活気のある", type: "positive" },
+                { id: 20, text: "恐れた", type: "negative" }
+            ];
+            
+            // 履歴データの初期化（localStorage から読み込み）
+            let historyData = JSON.parse(localStorage.getItem('panasHistory')) || [];
+            
+            // DOM要素の参照
+            const idInputForm = document.getElementById('idInputForm');
+            const surveyForm = document.getElementById('surveyForm');
+            const respondentIdInput = document.getElementById('respondentId');
+            const questionsContainer = document.getElementById('questionsContainer');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const historyContainer = document.getElementById('historyContainer');
+            const positiveScoreElem = document.getElementById('positiveScore');
+            const negativeScoreElem = document.getElementById('negativeScore');
+            const historyTableBody = document.getElementById('historyTable').querySelector('tbody');
+            
+            // Chart.js のチャートインスタンス
+            let resultsChart = null;
+            
+            // 評価開始ボタンのイベントリスナー
+            document.getElementById('startSurvey').addEventListener('click', function() {
+                const respondentId = respondentIdInput.value.trim();
+                if (!respondentId) {
+                    alert('回答者IDを入力してください');
+                    return;
+                }
+                
+                idInputForm.style.display = 'none';
+                surveyForm.style.display = 'block';
+                
+                // 質問項目をランダムに並べ替え
+                renderQuestions();
+            });
+            
+            // 質問項目のレンダリング
+            function renderQuestions() {
+                // panasItems の配列をシャッフル
+                const shuffledItems = [...panasItems].sort(() => Math.random() - 0.5);
+                
+                // 質問項目コンテナをクリア
+                questionsContainer.innerHTML = '';
+                
+                // 質問項目を追加
+                shuffledItems.forEach((item, index) => {
+                    const questionCard = document.createElement('div');
+                    questionCard.className = 'card mb-3 question-card';
+                    
+                    // 質問カードのHTML
+                    questionCard.innerHTML = `
+                        <div class="card-body">
+                            <p class="card-title fw-bold">${index + 1}. ${item.text}</p>
+                            <input type="hidden" name="questionId" value="${item.id}">
+                            <input type="hidden" name="questionType" value="${item.type}">
+                            
+                            <div class="scale-labels">
+                                <span>全く当てはまらない</span>
+                                <span>非常によく当てはまる</span>
+                            </div>
+                            <div class="rating-options">
+                                ${[1, 2, 3, 4, 5, 6].map(value => `
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="q${item.id}" id="q${item.id}_${value}" value="${value}" required>
+                                        <label class="form-check-label" for="q${item.id}_${value}">${value}</label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 質問カードを追加
+                    questionsContainer.appendChild(questionCard);
+                });
+            }
+            
+            // フォーム送信時のイベントリスナー
+            document.getElementById('panasForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // フォームデータを収集
+                const formData = new FormData(this);
+                const questionElements = questionsContainer.querySelectorAll('.question-card');
+                
+                // 結果の集計
+                let positiveTotal = 0;
+                let negativeTotal = 0;
+                const resultDetails = [];
+                
+                // 各質問の回答を処理
+                questionElements.forEach(element => {
+                    const questionId = element.querySelector('input[name="questionId"]').value;
+                    const questionType = element.querySelector('input[name="questionType"]').value;
+                    const rating = parseInt(formData.get(`q${questionId}`));
+                    
+                    // 質問タイプに基づいてスコアを加算
+                    if (questionType === 'positive') {
+                        positiveTotal += rating;
+                    } else {
+                        negativeTotal += rating;
+                    }
+                    
+                    // 詳細記録
+                    resultDetails.push({
+                        questionId,
+                        questionType,
+                        rating
+                    });
+                });
+                
+                // 日時を記録
+                const timestamp = new Date();
+                
+                // 結果を保存
+                const result = {
+                    timestamp: timestamp,
+                    timestampStr: timestamp.toLocaleString(),
+                    respondentId: respondentIdInput.value,
+                    positiveScore: positiveTotal,
+                    negativeScore: negativeTotal,
+                    details: resultDetails
+                };
+                
+                // 履歴に追加
+                historyData.push(result);
+                localStorage.setItem('panasHistory', JSON.stringify(historyData));
+                
+                // 結果を表示
+                displayResults(result);
+                updateHistoryTable();
+            });
+            
+            // 結果表示関数
+            function displayResults(result) {
+                surveyForm.style.display = 'none';
+                resultsContainer.style.display = 'block';
+                historyContainer.style.display = 'none';
+                
+                // スコア表示
+                positiveScoreElem.textContent = result.positiveScore + '/60';
+                negativeScoreElem.textContent = result.negativeScore + '/60';
+                
+                // グラフ表示
+                renderChart(result);
+            }
+            
+            // チャート描画関数
+            function renderChart(result) {
+                // 既存のチャートを破棄
+                if (resultsChart) {
+                    resultsChart.destroy();
+                }
+                
+                // チャートの描画
+                const ctx = document.getElementById('resultsChart').getContext('2d');
+                resultsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['ポジティブ感情', 'ネガティブ感情'],
+                        datasets: [{
+                            label: 'PANAS評価スコア',
+                            data: [result.positiveScore, result.negativeScore],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.5)',
+                                'rgba(255, 99, 132, 0.5)'
+                            ],
+                            borderColor: [
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 99, 132, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 60,
+                                title: {
+                                    display: true,
+                                    text: 'スコア'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'PANAS評価結果'
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // 履歴テーブル更新関数
+            function updateHistoryTable() {
+                historyTableBody.innerHTML = '';
+                
+                historyData.forEach((record, index) => {
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>${record.timestampStr}</td>
+                        <td>${record.respondentId}</td>
+                        <td>${record.positiveScore}/60</td>
+                        <td>${record.negativeScore}/60</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary view-result" data-index="${index}">詳細</button>
+                            <button class="btn btn-sm btn-danger delete-result" data-index="${index}">削除</button>
+                        </td>
+                    `;
+                    
+                    historyTableBody.appendChild(row);
+                });
+                
+                // 履歴内の詳細ボタンのイベントリスナー
+                document.querySelectorAll('.view-result').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = this.getAttribute('data-index');
+                        displayResults(historyData[index]);
+                    });
+                });
+                
+                // 履歴内の削除ボタンのイベントリスナー
+                document.querySelectorAll('.delete-result').forEach(button => {
+                    button.addEventListener('click', function() {
+                        if (confirm('この記録を削除しますか？')) {
+                            const index = this.getAttribute('data-index');
+                            historyData.splice(index, 1);
+                            localStorage.setItem('panasHistory', JSON.stringify(historyData));
+                            updateHistoryTable();
+                        }
+                    });
+                });
+            }
+            
+            // CSV形式でダウンロード
+            document.getElementById('downloadCSV').addEventListener('click', function() {
+                if (historyData.length === 0) {
+                    alert('ダウンロードする履歴データがありません');
+                    return;
+                }
+                
+                // CSV形式のヘッダー
+                let csvContent = "データ,回答者ID,ポジティブスコア,ネガティブスコア";
+                
+                // 質問項目のヘッダーを追加
+                panasItems.forEach(item => {
+                    csvContent += `,Q${item.id}(${item.type})`;
+                });
+                
+                csvContent += "\n";
+                
+                // 各行のデータを追加
+                historyData.forEach(record => {
+                    csvContent += `${record.timestampStr},${record.respondentId},${record.positiveScore},${record.negativeScore}`;
+                    
+                    // 質問の詳細を追加
+                    const detailsMap = {};
+                    record.details.forEach(detail => {
+                        detailsMap[detail.questionId] = detail.rating;
+                    });
+                    
+                    panasItems.forEach(item => {
+                        csvContent += `,${detailsMap[item.id] || ""}`;
+                    });
+                    
+                    csvContent += "\n";
+                });
+                
+                // BOMを追加してExcelでの文字化け対策
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8' });
+                
+                // ダウンロード用のリンクを作成
+                const downloadLink = document.createElement('a');
+                downloadLink.href = URL.createObjectURL(blob);
+                downloadLink.download = `panas_history_${new Date().toISOString().slice(0, 10)}.csv`;
+                downloadLink.click();
+            });
+            
+            // 履歴表示ボタンのイベントリスナー
+            document.getElementById('showHistory').addEventListener('click', function() {
+                resultsContainer.style.display = 'none';
+                historyContainer.style.display = 'block';
+                updateHistoryTable();
+            });
+            
+            // 結果に戻るボタンのイベントリスナー
+            document.getElementById('backToResults').addEventListener('click', function() {
+                historyContainer.style.display = 'none';
+                resultsContainer.style.display = 'block';
+            });
+            
+            // リセットボタンのイベントリスナー
+            document.getElementById('resetSurvey').addEventListener('click', function() {
+                resultsContainer.style.display = 'none';
+                historyContainer.style.display = 'none';
+                idInputForm.style.display = 'block';
+                
+                // フォームをリセット
+                document.getElementById('panasForm').reset();
+                respondentIdInput.value = '';
+            });
+        });
+    </script>
+</body>
+</html>
